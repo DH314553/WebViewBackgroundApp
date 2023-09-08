@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.view.WindowManager
 import android.webkit.WebView
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.preference.ListPreference
 import androidx.work.OneTimeWorkRequestBuilder
@@ -23,6 +24,7 @@ class MyWorker(context: Context, params: WorkerParameters) : Worker(context, par
     private lateinit var webView: WebView
     private val listPreference: SettingsActivity.SettingsFragment = SettingsActivity.SettingsFragment()
 
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun doWork(): Result {
         // WorkManagerのインスタンスを取得
         val workManager = WorkManager.getInstance(context)
@@ -31,7 +33,7 @@ class MyWorker(context: Context, params: WorkerParameters) : Worker(context, par
                 //webviewの表示(バックグラウンド)
                 MyGestureListener.showWebView(context as Activity, windowManager, webView.url.toString())
                 // チャネルの作成（APIレベル26以上の場合必須）
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val channel = NotificationChannel(
                         "my_channel",
                         "My Channel",

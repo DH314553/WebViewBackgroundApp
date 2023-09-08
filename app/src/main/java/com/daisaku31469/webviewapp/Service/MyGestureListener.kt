@@ -6,20 +6,23 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.view.*
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.annotation.RequiresApi
+import com.daisaku31469.webviewapp.MainActivity
 import com.daisaku31469.webviewapp.R
 
 
 class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
 
-    private lateinit var context: Context
     private lateinit var windowManager: WindowManager
     private lateinit var webView: WebView
 
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun onFling(
         e1: MotionEvent?,
         e2: MotionEvent,
@@ -37,8 +40,10 @@ class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
                 // ここで左から右へのスワイプが検出されました
                 // 何かの処理を行います
                 // WebView表示処理（System Alert Windowが必要）
-                showWebView(context as Activity, windowManager, webView.url.toString())
+                showWebView(context = MainActivity(), windowManager, webView.url.toString())
                 Log.d("Swipe", "Left to Right")
+            } else {
+                Log.d("Swipe", "other Swipe")
             }
         }
         return true
@@ -46,8 +51,9 @@ class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
 
     companion object {
         private lateinit var windowManager: WindowManager
+        @SuppressLint("StaticFieldLeak", "SetJavaScriptEnabled", "InflateParams")
 
-        @SuppressLint("SetJavaScriptEnabled", "InflateParams")
+        @RequiresApi(Build.VERSION_CODES.S)
         fun showWebView(context: Activity, windowManager: WindowManager, url: String) {
             val inflater = LayoutInflater.from(context)
             val view = inflater.inflate(R.layout.activity_main, null)
@@ -78,7 +84,7 @@ class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
             windowManager.addView(webView, params)
         }
 
-        private fun requestOverlayPermission(context: Activity, OVERLAY_PERMISSION_REQ_CODE: Int): WindowManager {
+        fun requestOverlayPermission(context: Activity, OVERLAY_PERMISSION_REQ_CODE: Int): WindowManager {
             val packageName = context.opPackageName
             if (!Settings.canDrawOverlays(context)) {
                 val intent = Intent(

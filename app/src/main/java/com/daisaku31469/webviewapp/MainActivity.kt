@@ -2,10 +2,7 @@ package com.daisaku31469.webviewapp
 
 import MyWorker
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -29,6 +26,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
     private lateinit var gestureDetector: GestureDetector
     private lateinit var windowManager: WindowManager
     private lateinit var webView: WebView
+    private val requestCode = 1001
 
     @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled", "RestrictedApi")
@@ -50,6 +48,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 
         MyGestureListener.showWebView(this, windowManager, this.webView.url.toString())
 
+
 //        if () {
 //            webView.setOnTouchListener(this)
 //        } else {
@@ -62,6 +61,35 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
     override fun onTouch(v: View?, event: MotionEvent?): Boolean {
         return gestureDetector.onTouchEvent(event!!)
     }
+
+    @SuppressLint("ResourceType")
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.xml.menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        val intent = Intent(this, SettingsActivity::class.java)
+        when (item.itemId) {
+            R.id.settings -> {
+                startActivityIfNeeded(intent, requestCode)
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == resultCode) {
+            if (resultCode == Activity.RESULT_OK) {
+                MyGestureListener.showWebView(this, windowManager, this.webView.url.toString())
+            }
+        }
+    }
+
 
     override fun onKeyDown(keyCode: Int, e: KeyEvent?): Boolean {
         return if (keyCode == KeyEvent.KEYCODE_BACK) { // 戻るボタンがタップされた時
