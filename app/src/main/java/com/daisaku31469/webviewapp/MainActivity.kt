@@ -17,7 +17,6 @@ import android.webkit.WebViewClient
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
-import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.daisaku31469.webviewapp.Service.MyGestureListener
@@ -44,14 +43,12 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         gestureDetector = GestureDetector(this, MyGestureListener())
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-
-        // Web Viewの初期設定
         // Web Viewの初期設定
         webView = findViewById<View>(R.id.mainLayout) as WebView
-        webView.webViewClient = WebViewClient() // WebViewを設定する
+        this.webView.webViewClient = WebViewClient() // WebViewを設定する
+        this.webView.settings.javaScriptEnabled = true // JavaScriptを有効にする
 
-        webView.settings.javaScriptEnabled = true // JavaScriptを有効にする
-        webView.loadUrl("https://google.com")
+        MyGestureListener.showWebView(this, windowManager, this.webView.url.toString())
 
 //        if () {
 //            webView.setOnTouchListener(this)
@@ -77,11 +74,11 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         }
     }
 
-    override fun onResume() {
-        super.onResume() // バックグラウンドからフォアグランドに戻った時など
-        val url = webView.url // 現在のウェブページを
-        webView.loadUrl(url!!) // 再表示する
-    }
+//    override fun onResume() {
+//        super.onResume() // バックグラウンドからフォアグランドに戻った時など
+//        val url = webView.url // 現在のウェブページを
+//        webView.loadUrl(url!!) // 再表示する
+//    }
 
 
     private inner class ForegroundService : Service() {
@@ -89,11 +86,9 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
             // Foregroundにする処理（通知の表示など）
             // 通知チャンネルを作成（Android Oreo以上）
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel("my_channel_id", "My Channel", NotificationManager.IMPORTANCE_DEFAULT)
-                val notificationManager = getSystemService(NotificationManager::class.java)
-                notificationManager?.createNotificationChannel(channel)
-            }
+            val channel = NotificationChannel("my_channel_id", "My Channel", NotificationManager.IMPORTANCE_DEFAULT)
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager?.createNotificationChannel(channel)
 
             // 通知をクリックしたときのインテント
             val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), 0)

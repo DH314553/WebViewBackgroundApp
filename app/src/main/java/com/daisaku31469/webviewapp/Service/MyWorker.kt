@@ -1,9 +1,11 @@
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.view.WindowManager
+import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 import androidx.preference.ListPreference
 import androidx.work.OneTimeWorkRequestBuilder
@@ -18,6 +20,7 @@ class MyWorker(context: Context, params: WorkerParameters) : Worker(context, par
 
     private lateinit var context: Context
     private lateinit var windowManager: WindowManager
+    private lateinit var webView: WebView
     private val listPreference: SettingsActivity.SettingsFragment = SettingsActivity.SettingsFragment()
 
     override fun doWork(): Result {
@@ -26,7 +29,7 @@ class MyWorker(context: Context, params: WorkerParameters) : Worker(context, par
         listPreference.findPreference<ListPreference>("reply")?.setOnPreferenceChangeListener { preference, newValue ->
             if (newValue as Boolean) {
                 //webviewの表示(バックグラウンド)
-                MyGestureListener.showWebView(context, windowManager)
+                MyGestureListener.showWebView(context as Activity, windowManager, webView.url.toString())
                 // チャネルの作成（APIレベル26以上の場合必須）
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val channel = NotificationChannel(
