@@ -13,8 +13,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.daisaku31469.webviewapp.MainActivity
 import com.daisaku31469.webviewapp.R
-import com.daisaku31469.webviewapp.Service.MyGestureListener
 import com.daisaku31469.webviewapp.SettingsActivity
 
 class MyWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -31,7 +31,7 @@ class MyWorker(context: Context, params: WorkerParameters) : Worker(context, par
         listPreference.findPreference<ListPreference>("reply")?.setOnPreferenceChangeListener { preference, newValue ->
             if (newValue as Boolean) {
                 //webviewの表示(バックグラウンド)
-                MyGestureListener.showWebView(context as Activity, windowManager, webView.url.toString())
+                MainActivity().showWebView(context as Activity, windowManager, webView.url.toString())
                 // チャネルの作成（APIレベル26以上の場合必須）
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val channel = NotificationChannel(

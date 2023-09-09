@@ -5,10 +5,7 @@ import android.app.Activity
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.view.WindowManager
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
@@ -17,7 +14,6 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.daisaku31469.webviewapp.Service.MyGestureListener
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -51,7 +47,7 @@ class SettingsActivity : AppCompatActivity() {
             if (preference is EditTextPreference) {
                 val value = sharedPreferences?.getString(key, "Default Value")
 //                preference.summary = value
-                MyGestureListener.showWebView(this.requireActivity(), windowManager, value!!)
+                MainActivity().showWebView(this.requireActivity(), windowManager, value!!)
             }
             if (preference is ListPreference) {
                 val value = sharedPreferences?.getString(key, "Default Value")

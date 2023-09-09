@@ -5,18 +5,22 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
+import android.util.Log
 import android.view.*
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.app.NotificationCompat
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.daisaku31469.webviewapp.Service.MyGestureListener
 import com.daisaku31469.webviewapp.databinding.ActivityMainBinding
 
 
@@ -26,6 +30,9 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
     private lateinit var gestureDetector: GestureDetector
     private lateinit var windowManager: WindowManager
     private lateinit var webView: WebView
+    private lateinit var params: WindowManager.LayoutParams
+    private lateinit var view: CoordinatorLayout
+    private lateinit var event: MotionEvent
     private val requestCode = 1001
 
     @RequiresApi(Build.VERSION_CODES.S)
@@ -39,16 +46,20 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         setSupportActionBar(binding.toolbar)
 
         gestureDetector = GestureDetector(this, MyGestureListener())
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        this.windowManager = requestOverlayPermission(this, 1001)
 
         // Web Viewの初期設定
         webView = findViewById<View>(R.id.mainLayout) as WebView
-        this.webView.webViewClient = WebViewClient() // WebViewを設定する
-        this.webView.settings.javaScriptEnabled = true // JavaScriptを有効にする
+        webView.webViewClient = WebViewClient() // WebViewを設定する
+        webView.settings.javaScriptEnabled = true // JavaScriptを有効にする
 
-        MyGestureListener.showWebView(this, windowManager, this.webView.url.toString())
+        showWebView(this, windowManager, webView.url.toString())
 
-
+        webView.setOnTouchListener { _, motionEvent ->
+            gestureDetector.onTouchEvent(motionEvent)
+            showWebView(this, windowManager, webView.url.toString())
+            true
+        }
 //        if () {
 //            webView.setOnTouchListener(this)
 //        } else {
@@ -56,10 +67,65 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 //        }
     }
 
+    @SuppressLint("SetJavaScriptEnabled", "InflateParams")
+    @RequiresApi(Build.VERSION_CODES.S)
+    fun showWebView(context: Activity, windowManager: WindowManager, url: String) {
+
+        val inflater = LayoutInflater.from(context)
+        view = inflater.inflate(R.layout.activity_main, null) as CoordinatorLayout
+        val webView: WebView = view.findViewById(R.id.mainLayout) // IDを正確に指定する
+        val defaultUrl = "https://google.com"
+        val urlReplace = if (url == "") defaultUrl else url
+
+
+        webView.webViewClient = WebViewClient()
+        webView.settings.javaScriptEnabled = true
+        webView.loadUrl(defaultUrl)
+
+        params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        )
+
+        params.gravity = Gravity.CENTER
+
+
+        if (webView.parent == null || webView.parent != windowManager) {
+            // webViewは既に初期化されていると仮定
+            if (webView.parent != null) {
+                (webView.parent as ViewGroup).removeView(webView)  // 既存の親からWebViewを削除
+            }
+
+
+            windowManager.addView(webView, params)  // WindowManagerにWebViewを追加
+        } else {
+            windowManager.removeView(webView)  // WindowManagerからWebViewを削除
+
+            // 元の親ビューにWebViewを追加（ここではLinearLayoutを例としています）
+            val linearLayout = view.findViewById<CoordinatorLayout>(R.id.layout)
+            linearLayout?.addView(webView)
+        }
+    }
+
+    fun requestOverlayPermission(context: Activity, OVERLAY_PERMISSION_REQ_CODE: Int): WindowManager {
+        val packageName = context.opPackageName
+        if (!Settings.canDrawOverlays(context)) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            context.startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
+        }
+        return context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    }
+
 
     @SuppressLint("ClickableViewAccessibility")
-    override fun onTouch(v: View?, event: MotionEvent?): Boolean {
-        return gestureDetector.onTouchEvent(event!!)
+    override fun onTouch(p0: View?, event: MotionEvent?): Boolean {
+        return gestureDetector.onGenericMotionEvent(event!!)
     }
 
     @SuppressLint("ResourceType")
@@ -85,7 +151,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == resultCode) {
             if (resultCode == Activity.RESULT_OK) {
-                MyGestureListener.showWebView(this, windowManager, this.webView.url.toString())
+                showWebView(this, windowManager, webView.url.toString())
             }
         }
     }
@@ -141,6 +207,53 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 
         override fun onBind(intent: Intent?): IBinder? {
             TODO("Not yet implemented")
+        }
+    }
+
+    inner class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
+
+        private lateinit var windowManager: WindowManager
+        private lateinit var webView: WebView
+
+        @RequiresApi(Build.VERSION_CODES.S)
+        override fun onFling(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            velocityX: Float,
+            velocityY: Float
+        ): Boolean {
+            // スワイプ検出（例：左から右へのスワイプ）
+            val deltaX = e2.x - e1!!.x
+            val deltaY = e2.y - e1.y
+
+
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0) {
+                    // ここで左から右へのスワイプが検出されました
+                    // 何かの処理を行います
+                    // WebView表示処理（System Alert Windowが必要）
+                    showWebView(MainActivity(), windowManager, webView.url.toString())
+                    Log.d("Swipe", "Left to Right")
+                } else {
+                    Log.d("Swipe", "other Swipe")
+                }
+            }
+            return true
+        }
+
+        // 他の GestureDetector.OnGestureListener のメソッドも実装
+        override fun onDown(e: MotionEvent): Boolean = false
+        override fun onShowPress(e: MotionEvent) {}
+        override fun onSingleTapUp(e: MotionEvent): Boolean = false
+        override fun onScroll(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            distanceX: Float,
+            distanceY: Float
+        ): Boolean = false
+
+        override fun onLongPress(e: MotionEvent) {
         }
     }
 }
