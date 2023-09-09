@@ -2,12 +2,18 @@ package com.daisaku31469.webviewapp
 
 import MyWorker
 import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import android.webkit.WebView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -17,6 +23,9 @@ import androidx.work.WorkManager
 
 class SettingsActivity : AppCompatActivity() {
 
+    private lateinit var webView: WebView
+
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.settings_activity)
@@ -27,12 +36,43 @@ class SettingsActivity : AppCompatActivity() {
                 .commit()
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        MyWorker.listPreference.findPreference<ListPreference>("reply")?.setOnPreferenceClickListener {
+            // ここにクリック時の処理を書く
+            // webviewの表示(バックグラウンド)
+            MainActivity().showWebView(this, windowManager, webView.url.toString())
+            // チャネルの作成（APIレベル26以上の場合必須）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val channel = NotificationChannel(
+                    "my_channel",
+                    "My Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+                val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                manager?.createNotificationChannel(channel)
+            }
+
+            // 通知の作成と表示
+            val builder = NotificationCompat.Builder(applicationContext, "my_channel")
+                .setSmallIcon(R.drawable.baseline_message_24)  // このアイコンはあなたがプロジェクトに追加する必要があります
+                .setContentTitle("My Notification")
+                .setContentText("Hello World!")
+
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.notify(1, builder.build())
+            // 条件が満たされたらブロードキャストを送信
+            val intent = Intent("com.example.SHOW_WEBVIEW")
+            applicationContext.sendBroadcast(intent)
+            // WorkManagerを起動
+            MyWorker.workManager.enqueue(MyWorker.workRequest)
+
+            true // 何らかの処理を行った後にtrueを返すことで、デフォルトの動作（設定画面が閉じるなど）を無効にする
+        }
     }
 
     class SettingsFragment : PreferenceFragmentCompat(),
         SharedPreferences.OnSharedPreferenceChangeListener {
         private lateinit var windowManager: WindowManager
-        private lateinit var context: Activity
+//        private lateinit var context: Activity
         @RequiresApi(Build.VERSION_CODES.S)
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey)
@@ -46,17 +86,17 @@ class SettingsActivity : AppCompatActivity() {
             val preference = findPreference<Preference>(key!!)
             if (preference is EditTextPreference) {
                 val value = sharedPreferences?.getString(key, "Default Value")
-//                preference.summary = value
-                MainActivity().showWebView(this.requireActivity(), windowManager, value!!)
+                preference.summary = value
+                val url = preference.summary
+                MainActivity().showWebView(this.requireActivity(), windowManager, url as String?)
             }
             if (preference is ListPreference) {
                 val value = sharedPreferences?.getString(key, "Default Value")
                 if (value.equals("ON")) {
                     // WorkManagerを起動
-                    val workRequest = OneTimeWorkRequestBuilder<MyWorker>().build()
-                    WorkManager.getInstance(context.applicationContext).enqueue(workRequest)
+                    WorkManager.getInstance(this.requireActivity()).enqueue(workRequest)
                 } else {
-                    val workManager = WorkManager.getInstance(context.applicationContext)
+
                     workManager.cancelAllWork()
                 }
             }
@@ -71,5 +111,10 @@ class SettingsActivity : AppCompatActivity() {
             super.onPause()
             preferenceScreen.sharedPreferences?.unregisterOnSharedPreferenceChangeListener(this)
         }
+    }
+
+    companion object {
+        val workRequest = OneTimeWorkRequestBuilder<MyWorker>().build()
+        val workManager = WorkManager.getInstance(Activity())
     }
 }
