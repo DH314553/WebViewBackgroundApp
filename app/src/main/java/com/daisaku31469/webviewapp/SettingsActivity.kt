@@ -9,21 +9,16 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
-import android.webkit.WebView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
-import androidx.preference.EditTextPreference
-import androidx.preference.ListPreference
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.*
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 
 class SettingsActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
+//    private lateinit var webView: WebView
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,10 +31,10 @@ class SettingsActivity : AppCompatActivity() {
                 .commit()
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        setResult(0, intent)
         MyWorker.listPreference.findPreference<ListPreference>("reply")?.setOnPreferenceClickListener {
             // ここにクリック時の処理を書く
             // webviewの表示(バックグラウンド)
-            MainActivity().showWebView(this, windowManager, webView.url.toString())
             // チャネルの作成（APIレベル26以上の場合必須）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val channel = NotificationChannel(
@@ -63,15 +58,18 @@ class SettingsActivity : AppCompatActivity() {
             val intent = Intent("com.example.SHOW_WEBVIEW")
             applicationContext.sendBroadcast(intent)
             // WorkManagerを起動
-            MyWorker.workManager.enqueue(MyWorker.workRequest)
-
+            if (value == "ON") {
+                MyWorker.workManager.enqueue(MyWorker.workRequest)
+            } else {
+                MyWorker.workManager.cancelAllWork()
+            }
             true // 何らかの処理を行った後にtrueを返すことで、デフォルトの動作（設定画面が閉じるなど）を無効にする
         }
     }
 
     class SettingsFragment : PreferenceFragmentCompat(),
         SharedPreferences.OnSharedPreferenceChangeListener {
-        private lateinit var windowManager: WindowManager
+//        private lateinit var windowManager: WindowManager
 //        private lateinit var context: Activity
         @RequiresApi(Build.VERSION_CODES.S)
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -83,15 +81,25 @@ class SettingsActivity : AppCompatActivity() {
         @RequiresApi(Build.VERSION_CODES.S)
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             // Preferenceが変更されたときの処理をここで行う
-            val preference = findPreference<Preference>(key!!)
-            if (preference is EditTextPreference) {
-                val value = sharedPreferences?.getString(key, "Default Value")
-                preference.summary = value
-                val url = preference.summary
-                MainActivity().showWebView(this.requireActivity(), windowManager, url as String?)
+            val editPreference = findPreference<EditTextPreference>(key!!)
+            val listPreference = findPreference<Preference>(key)
+            val intent = Intent(this.requireActivity(), MainActivity::class.java)
+            editPreference?.summaryProvider = null // 既存のSummaryProviderを削除
+            listPreference?.summaryProvider = null
+            if (editPreference is EditTextPreference) {
+                value = sharedPreferences?.getString(key, "Default Value").toString()
+                editPreference.summary = value
+                // Shared Preferencesに保存
+                val sharedPref = PreferenceManager.getDefaultSharedPreferences(this.requireActivity())
+                val editor = sharedPref.edit()
+                intent.putExtra("url", value)
+                editor.putString("webview_url", value)
+                editor.apply()
+                startActivityForResult(intent, 0)
             }
-            if (preference is ListPreference) {
+            if (listPreference is ListPreference) {
                 val value = sharedPreferences?.getString(key, "Default Value")
+                listPreference.summary = value
                 if (value.equals("ON")) {
                     // WorkManagerを起動
                     WorkManager.getInstance(this.requireActivity()).enqueue(workRequest)
@@ -114,6 +122,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        var value = ""
         val workRequest = OneTimeWorkRequestBuilder<MyWorker>().build()
         val workManager = WorkManager.getInstance(Activity())
     }

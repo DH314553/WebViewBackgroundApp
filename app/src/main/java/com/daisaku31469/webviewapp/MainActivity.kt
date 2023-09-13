@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
@@ -16,16 +15,15 @@ import android.util.Log
 import android.view.*
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.work.OneTimeWorkRequestBuilder
+import androidx.preference.PreferenceManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.daisaku31469.webviewapp.databinding.ActivityMainBinding
+import kotlin.math.abs
 
 
 class MainActivity : AppCompatActivity(), View.OnTouchListener {
@@ -37,7 +35,8 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 //    private lateinit var params: WindowManager.LayoutParams
 //    private lateinit var view: CoordinatorLayout
 //    private lateinit var event: MotionEvent
-    private val requestCode = 1001
+    private val requestCode = 0
+    private var url = ""
 
     @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled", "RestrictedApi")
@@ -54,14 +53,21 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         // Web Viewの初期設定
         webView = findViewById<View>(R.id.mainLayout) as WebView
 
-        webView.settings.javaScriptEnabled = true // JavaScriptを有効にする
+//        val extras = intent?.extras
+//        if (extras != null) {
+//            url = extras.getString("url")!!
+//            // TODO: ここで値を使う
+//        }
 
-        this.windowManager = requestOverlayPermission(this, 1001)
-        showWebView(this, windowManager, webView.url.toString())
+        val sharedPref = PreferenceManager.getDefaultSharedPreferences(this)
+        url = sharedPref.getString("webview_url", url).toString()
+
+        this.windowManager = requestOverlayPermission(this)
+        showWebView(this, windowManager, url)
 
         webView.setOnTouchListener { _, motionEvent ->
             gestureDetector.onGenericMotionEvent(motionEvent)
-            showWebView(this, windowManager, webView.url.toString())
+            showWebView(this, windowManager, url)
             false
         }
 
@@ -148,7 +154,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 //        }
     }
 
-    fun showJobWebView() {
+    private fun showJobWebView() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
@@ -170,11 +176,16 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         val inflater = LayoutInflater.from(context)
         val view = inflater.inflate(R.layout.activity_main, null) as CoordinatorLayout
         val webView: WebView = view.findViewById(R.id.mainLayout) ?: return  // IDを正確に指定する
-        val defaultUrl = "https://google.com"
-        val urlToLoad = url?.takeIf { it.isEmpty() } ?: defaultUrl
+        val defaultGoogleEngine = "https://google.com/search?q=$url"  // Google
+        val defaultYahooEngine = "https://search.yahoo.com/search?p="  // Yahoo
+        val defaultBingEngine = "https://www.bing.com/search?q="  // Bing
+        // Shared Preferencesからデータを取得
+        val urlToLoad = url.takeIf { it!!.isEmpty() } ?: defaultGoogleEngine
 
         webView.webViewClient = WebViewClient()
         webView.settings.javaScriptEnabled = true
+        // Web Storage を有効化
+        webView.settings.domStorageEnabled = true
         webView.loadUrl(urlToLoad)
 
         val params = WindowManager.LayoutParams(
@@ -186,6 +197,8 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         )
 
         params.gravity = Gravity.CENTER
+        params.x = 0
+        params.y = 0
 
 
         if (webView.parent == null || webView.parent != windowManager) {
@@ -242,14 +255,14 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
     }
 
 
-    fun requestOverlayPermission(context: Activity, OVERLAY_PERMISSION_REQ_CODE: Int): WindowManager {
+    private fun requestOverlayPermission(context: Activity): WindowManager {
         val packageName = context.opPackageName
         if (!Settings.canDrawOverlays(context)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
-            context.startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
+            context.startActivityForResult(intent, requestCode)
         }
         return context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     }
@@ -266,6 +279,15 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         return true
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == resultCode) {
+            url = data!!.getStringExtra("url").toString()
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         val intent = Intent(this, SettingsActivity::class.java)
         when (item.itemId) {
@@ -276,30 +298,6 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
         }
         return super.onOptionsItemSelected(item)
     }
-
-    @RequiresApi(Build.VERSION_CODES.S)
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == resultCode) {
-            if (ActivityCompat.checkSelfPermission(Activity(), Settings.ACTION_MANAGE_OVERLAY_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(Activity(), arrayOf(Settings.ACTION_MANAGE_OVERLAY_PERMISSION), resultCode)
-            }
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == this.requestCode) {
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                // ユーザーが許可した場合の処理
-            } else {
-                // ユーザーが許可しなかった場合の処理
-                Toast.makeText(Activity(), "失敗しました", requestCode).show()
-            }
-        }
-    }
-
 
     override fun onKeyDown(keyCode: Int, e: KeyEvent?): Boolean {
         return if (keyCode == KeyEvent.KEYCODE_BACK) { // 戻るボタンがタップされた時
@@ -321,6 +319,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 
     inner class ForegroundService : Service() {
 
+        @SuppressLint("UnspecifiedImmutableFlag")
         override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
             // Foregroundにする処理（通知の表示など）
             // 通知チャンネルを作成（Android Oreo以上）
@@ -342,9 +341,7 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
             // フォアグラウンドサービスを開始
             startForeground(1, notification)
 
-            // WorkManagerを起動
-            val workRequest = OneTimeWorkRequestBuilder<MyWorker>().build()
-            WorkManager.getInstance(applicationContext).enqueue(workRequest)
+            SettingsActivity.workManager.cancelAllWork()
 
             return START_STICKY
         }
@@ -357,7 +354,6 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
     inner class MyGestureListener : GestureDetector.SimpleOnGestureListener() {
 
         private lateinit var windowManager: WindowManager
-        private lateinit var webView: WebView
 
         @RequiresApi(Build.VERSION_CODES.S)
         override fun onFling(
@@ -372,12 +368,12 @@ class MainActivity : AppCompatActivity(), View.OnTouchListener {
 
 
 
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            if (abs(deltaX) > abs(deltaY)) {
                 if (deltaX > 100) {
                     // ここで左から右へのスワイプが検出されました
                     // 何かの処理を行います
                     // WebView表示処理（System Alert Windowが必要）
-                    showWebView(MainActivity(), windowManager, webView.url.toString())
+                    showWebView(MainActivity(), windowManager, url)
                     Log.d("Swipe", "Left to Right")
                 } else {
                     Log.d("Swipe", "other Swipe")
